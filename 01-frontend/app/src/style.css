@@ -1,0 +1,149 @@
+/* Reset simples */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Corpo geral */
+body {
+  position: relative;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(120deg, #934863, #9187c9);
+  color: #f4fbcb;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5); /* camada preta translúcida */
+  z-index: 0;
+}
+
+/* Cabeçalho */
+header {
+  background: rgba(147, 72, 99, 0.8); /* #934863 com transparência */
+  padding: 15px 30px;
+  position: relative;
+  z-index: 1;
+}
+
+nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+nav .logo {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #f4fbcb;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 20px;
+}
+
+nav a {
+  color: #f4fbcb;
+  text-decoration: none;
+  transition: 0.3s;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+/* Seção principal */
+.hero {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 40px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-content {
+  background: rgba(145, 135, 201, 0.2); /* #9187C9 com transparência */
+  padding: 30px;
+  border-radius: 10px;
+  animation: fadeIn 1s ease-in-out;
+  color: #f4fbcb;
+  position: relative;
+  z-index: 2;
+}
+
+.hero h2 {
+  font-size: 2rem;
+  margin-bottom: 15px;
+}
+
+.hero p {
+  margin-bottom: 20px;
+  font-size: 1.1rem;
+}
+
+/* Botão */
+button {
+  background: #f4fbcb;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 6px;
+  color: #934863;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+button:hover {
+  background: #9187c9;
+  color: #f4fbcb;
+}
+
+/* Rodapé */
+footer {
+  background: rgba(147, 72, 99, 0.8); /* #934863 com transparência */
+  text-align: center;
+  padding: 10px;
+  font-size: 0.9rem;
+  color: #f4fbcb;
+  position: relative;
+  z-index: 1;
+}
+
+/* Animação */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsivo */
+@media (max-width: 600px) {
+  nav ul {
+    display: none;
+  }
+  .hero h2 {
+    font-size: 1.5rem;
+  }
+}
