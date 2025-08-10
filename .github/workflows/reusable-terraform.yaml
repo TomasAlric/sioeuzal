@@ -1,0 +1,147 @@
+name: "Terraform Workflow"
+
+on:
+  workflow_call:
+    inputs:
+      aws-environment:
+        required: true
+        type: string
+      aws-region:
+        required: true
+        type: string
+      aws-statefile-s3-bucket:
+        type: string
+        required: true   
+      aws-lock-dynamodb-table:
+        type: string
+        required: true   
+    secrets:
+      aws-assume-role-arn:
+        required: true
+      aws-account-id:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.aws-assume-role-arn }}
+          role-session-name: GitHubActions-to-AWS-FederatedOIDC
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Read destroy configuration
+        id: read-destroy-config
+        run: |
+          DESTROY=$(jq -r '.${{ inputs.aws-environment }}' ./destroy_config.json)
+          echo "destroy=$DESTROY" >> $GITHUB_ENV
+
+      - name: Build and Push Backend Image
+        if: env.destroy != 'true'
+        run: |
+          cd 02-backend/app
+          
+          ECR_REPOSITORY="${{ secrets.aws-account-id }}.dkr.ecr.${{ inputs.aws-region }}.amazonaws.com/sioeuzal-${{ inputs.aws-environment }}"
+          
+          # Login to ECR
+          aws ecr get-login-password --region ${{ inputs.aws-region }} | \
+          docker login --username AWS --password-stdin ${ECR_REPOSITORY}
+          
+          # Build image
+          docker build -t backend-app .
+          
+          # Tag image with timestamp
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          docker tag backend-app:latest ${ECR_REPOSITORY}:${TIMESTAMP}
+          docker tag backend-app:latest ${ECR_REPOSITORY}:latest
+          
+          # Push image
+          docker push ${ECR_REPOSITORY}:${TIMESTAMP}
+          docker push ${ECR_REPOSITORY}:latest
+          
+          # Save image tag for later use
+          echo "IMAGE_TAG=${TIMESTAMP}" >> $GITHUB_ENV
+          
+          cd ../..
+
+      - name: Run Terraform destroy
+        if: env.destroy == 'true'
+        run: |
+          set -e
+          modules=("03-cronjob" "02-backend" "01-frontend")
+          
+          for dir in "${modules[@]}"; do
+            echo "Destroying infrastructure in: $dir"
+            cd $dir/infra
+            
+            terraform init \
+              -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
+              -backend-config="region=${{ inputs.aws-region }}" \
+              -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
+            
+            terraform destroy -var-file=../inventories/${{ inputs.aws-environment }}/terraform.tfvars -auto-approve
+            
+            cd ../..
+          done
+
+      - name: Run Terraform Apply
+        if: env.destroy != 'true'
+        run: |
+          set -e
+          modules=("01-frontend" "02-backend" "03-cronjob")
+          
+          for dir in "${modules[@]}"; do
+            echo "Deploying infrastructure in: $dir"
+            cd $dir/infra
+            
+            terraform init \
+              -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
+              -backend-config="region=${{ inputs.aws-region }}" \
+              -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
+            
+            # Add image tag for backend module
+            if [ "$dir" == "02-backend" ]; then
+              TF_VAR_container_image_tag=${{ env.IMAGE_TAG }}
+            fi
+            
+            terraform plan -var-file=../inventories/${{ inputs.aws-environment }}/terraform.tfvars -out=tfplan
+            terraform apply -auto-approve tfplan
+            
+            # Upload frontend files if this is the frontend module
+            if [ "$dir" == "01-frontend" ]; then
+              echo "Uploading frontend files to S3..."
+              BUCKET_ID=$(terraform output -raw bucket_name)
+              aws s3 sync ../app/src/ s3://${BUCKET_ID}/ --delete
+            fi
+            
+            cd ../..
+          done
+
+      - name: Invalidate CloudFront Cache
+        if: env.destroy != 'true'
+        run: |
+          cd 01-frontend/infra
+          DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
+          if [ ! -z "$DISTRIBUTION_ID" ]; then
+            aws cloudfront create-invalidation --distribution-id ${DISTRIBUTION_ID} --paths "/*"
+          fi
+          cd ../..

@@ -1,0 +1,93 @@
+name: "Terraform Custom"
+
+on:
+  workflow_dispatch:
+    inputs:
+      terraform-directory:
+        description: 'Terraform module directory to execute'
+        required: true
+        type: string
+      destroy:
+        description: 'Whether to run terraform destroy (true/false)'
+        required: true
+        type: string
+      aws-environment:
+        description: 'Environment (dev, hom, prod)'
+        required: true
+        type: string
+      aws-region:
+        description: 'AWS region'
+        required: true
+        type: string  
+      branch:
+        description: 'Repository branch to use'
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+  issues: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+
+      - name: Set environment-specific configurations
+        run: |
+          echo "AWS_ENVIRONMENT=dev" >> $GITHUB_ENV
+          echo "AWS_REGION=${{ inputs.aws-region }}" >> $GITHUB_ENV
+          echo "STATEFILE_BUCKET=${{ vars.STATEFILE_BUCKET_NAME_TF_DEV }}" >> $GITHUB_ENV
+          echo "LOCK_DYNAMODB_TABLE=${{ secrets.DYNAMODB_TABLE_TF_DEV }}" >> $GITHUB_ENV
+          echo "AWS_ASSUME_ROLE_ARN=${{ secrets.AWS_ASSUME_ROLE_ARN_DEV }}" >> $GITHUB_ENV
+        
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ASSUME_ROLE_ARN }}
+          role-session-name: GitHubActions-to-AWS-FederatedOIDC
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Run Terraform in Custom Directory
+        run: |
+          set -e
+
+          DIR="${{ inputs.terraform-directory }}"
+          DESTROY="${{ inputs.destroy }}"
+
+          echo "Executando Terraform no diretório: $DIR"
+          
+          cd $DIR
+
+          echo "Terraform Init"
+          terraform init \
+            -backend-config="bucket=${STATEFILE_BUCKET}" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="dynamodb_table=${LOCK_DYNAMODB_TABLE}"
+
+          if [[ "$DESTROY" == "true" ]]; then
+            echo "Executando Terraform Destroy no diretório: $DIR"
+            terraform destroy -var-file=../inventories/${AWS_ENVIRONMENT}/terraform.tfvars -auto-approve
+          else
+            echo "Executando Terraform Plan em $DIR"
+            terraform plan -var-file=../inventories/${AWS_ENVIRONMENT}/terraform.tfvars -out="${AWS_ENVIRONMENT}.plan"
+            echo "Executando Terraform Apply em $DIR"
+            terraform apply "${AWS_ENVIRONMENT}.plan"
+          fi
+
+          cd ..
+          echo "Concluído: $DIR"
