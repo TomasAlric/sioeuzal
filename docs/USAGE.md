@@ -114,13 +114,13 @@ O projeto utiliza GitHub Actions para CI/CD. Os workflows estão em `.github/wor
 ### Passos para configurar o acesso AWS via GitHub Actions OIDC
 
 1. **Criar um bucket S3 na AWS para ser o Statefile File**  
-   - Copiar o nome do bucket para usar no GitHub.
+   - Anote o nome do bucket para usar no GitHub.
 
 2. **Criar o Provedor OIDC no IAM**  
-   - No console AWS, vá em **IAM > Identity providers > Add provider**.  
-   - Selecione **OpenID Connect**.  
+   - No console AWS, vá em **IAM > Provedores de identidade > Adicionar provedor**.  
+   - Em tipo de provedor, selecione **OpenID Connect**.  
    - Informe a URL: `https://token.actions.githubusercontent.com`.  
-   - Defina o **Audience** como `sts.amazonaws.com`.  
+   - Defina o **Público** como `sts.amazonaws.com`.  
    - Finalize para criar o provedor.
 
 3. **Criar a Role IAM para o GitHub Actions**  
