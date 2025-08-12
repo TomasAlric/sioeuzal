@@ -66,6 +66,8 @@ docker tag backend-app:latest <account-id>.dkr.ecr.us-east-1.amazonaws.com/sioeu
 
 # Push da imagem
 docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/sioeuzal-dev:latest
+
+Acessar a tarefa do ECS pelo IP público para validar
 ```
 
 2. **Deploy da Infraestrutura**
@@ -107,7 +109,81 @@ O projeto utiliza GitHub Actions para CI/CD. Os workflows estão em `.github/wor
 }
 ```
 
-#### Acionamento do Pipeline
+## Acionamento do Pipeline com Autenticação OIDC
 
-- Push para qualquer branch: Aciona deploy
-- Alterar `destroy_config.json` para `true`: Aciona destroy dos recursos
+### Passos para configurar o acesso AWS via GitHub Actions OIDC
+
+1. **Criar um bucket S3 na AWS para ser o Statefile File**  
+   - Copiar o nome do bucket para usar no GitHub.
+
+2. **Criar o Provedor OIDC no IAM**  
+   - No console AWS, vá em **IAM > Identity providers > Add provider**.  
+   - Selecione **OpenID Connect**.  
+   - Informe a URL: `https://token.actions.githubusercontent.com`.  
+   - Defina o **Audience** como `sts.amazonaws.com`.  
+   - Finalize para criar o provedor.
+
+3. **Criar a Role IAM para o GitHub Actions**  
+   - Crie uma role com tipo de entidade confiável **Web Identity**.  
+   - Selecione o provedor OIDC criado.  
+   - Defina o Audience como `sts.amazonaws.com`.  
+   - Configure a trust policy para permitir somente seu repositório e branch, por exemplo:
+
+    ```json
+    {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Principal": {
+            "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+          },
+          "Action": "sts:AssumeRoleWithWebIdentity",
+          "Condition": {
+            "StringEquals": {
+              "token.actions.githubusercontent.com:sub": "repo:<ORG>/<REPO>:ref:refs/heads/<BRANCH>",
+              "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+            }
+          }
+        }
+      ]
+    }
+    ```
+
+4. **Adicionar as permissões necessárias na Role**  
+
+   Para facilitar e garantir todas as permissões necessárias no pipeline, considere anexar as seguintes políticas gerenciadas AWS com acesso completo (**FullAccess**):
+
+   | Serviço / Recurso                   | Políticas Gerenciadas AWS FullAccess                  |
+   |-----------------------------------|-------------------------------------------------------|
+   | **S3**                            | `AmazonS3FullAccess`                                  |
+   | **DynamoDB** (se usar lock)       | `AmazonDynamoDBFullAccess`                            |
+   | **CloudWatch Logs**               | `CloudWatchLogsFullAccess`                            |
+   | **IAM** (para roles e trust)      | `IAMFullAccess`                                       |
+   | **Lambda**                       | `AWSLambda_FullAccess`                                |
+   | **EventBridge**                  | `AmazonEventBridgeFullAccess`                         |
+   | **ECS / ECR** (se usar container) | `AmazonECS_FullAccess`, `AmazonECRFullAccess`        |
+   | **CloudFront**                   | `CloudFrontFullAccess`                                |
+
+   > ⚠️ **Atenção:**  
+   > O uso de políticas FullAccess fornece permissões amplas. Em ambientes de produção, é recomendável criar políticas com o princípio do menor privilégio, limitando permissões apenas ao necessário e restringindo recursos via ARNs.
+
+5. **Configurar o GitHub Actions**  
+   - Configure as variáveis de ambiente no GitHub Actions Secrets and Variables, por exemplo:
+
+    ```yaml
+    vars:
+      AWS_REGION
+      STATEFILE_BUCKET_NAME_TF_DEV
+    secrets:
+      AWS_ASSUME_ROLE_ARN_DEV
+      AWS_ACCOUNT_ID_DEV
+    ```
+
+6. **Configurar o arquivo de destroy_config.json**
+
+   ```json
+      {
+         "dev": false
+      }
+   ```
