@@ -11,10 +11,7 @@ on:
         type: string
       aws-statefile-s3-bucket:
         type: string
-        required: true   
-      aws-lock-dynamodb-table:
-        type: string
-        required: true   
+        required: true
     secrets:
       aws-assume-role-arn:
         required: true
@@ -96,7 +93,6 @@ jobs:
             terraform init \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
               -backend-config="region=${{ inputs.aws-region }}" \
-              -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
             
             terraform destroy -var-file=../inventories/${{ inputs.aws-environment }}/terraform.tfvars -auto-approve
             
@@ -115,8 +111,7 @@ jobs:
             
             terraform init \
               -backend-config="bucket=${{ inputs.aws-statefile-s3-bucket }}" \
-              -backend-config="region=${{ inputs.aws-region }}" \
-              -backend-config="dynamodb_table=${{ inputs.aws-lock-dynamodb-table }}"
+              -backend-config="region=${{ inputs.aws-region }}"
             
             # Add image tag for backend module
             if [ "$dir" == "02-backend" ]; then
