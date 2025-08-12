@@ -112,6 +112,10 @@ O projeto utiliza GitHub Actions para CI/CD. Os workflows estão em `.github/wor
 ## Acionamento do Pipeline com Autenticação OIDC
 
 ### Passos para configurar o acesso AWS via GitHub Actions OIDC
+1. Pré requisitos:
+   - Ter uma organization no Github
+
+
 
 1. **Criar um bucket S3 na AWS para ser o Statefile File**  
    - Anote o nome do bucket para usar no GitHub.
@@ -130,43 +134,52 @@ O projeto utiliza GitHub Actions para CI/CD. Os workflows estão em `.github/wor
    - Configure a trust policy para permitir somente seu repositório e branch, por exemplo:
 
     ```json
-    {
-      "Version": "2012-10-17",
-      "Statement": [
-        {
-          "Effect": "Allow",
-          "Principal": {
-            "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
-          },
-          "Action": "sts:AssumeRoleWithWebIdentity",
-          "Condition": {
-            "StringEquals": {
-              "token.actions.githubusercontent.com:sub": "repo:<ORG>/<REPO>:ref:refs/heads/<BRANCH>",
-              "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+      {
+      "Version":"2012-10-17",
+      "Statement":[
+         {
+            "Effect":"Allow",
+            "Action":"sts:AssumeRoleWithWebIdentity",
+            "Principal":{
+               "Federated":"arn:aws:iam::<ACCOUNT-ID>:oidc-provider/token.actions.githubusercontent.com"
+            },
+            "Condition":{
+               "StringEquals":{
+                  "token.actions.githubusercontent.com:aud":[
+                     "sts.amazonaws.com"
+                  ]
+               },
+               "StringLike":{
+                  "token.actions.githubusercontent.com:sub":[
+                     "repo:<ORG>/*"
+                  ]
+               }
             }
-          }
-        }
+         }
       ]
-    }
+   }
     ```
+
+   - Dê um nome a role ex -> role-pipeline-gh-actions
 
 4. **Adicionar as permissões necessárias na Role**  
 
    Para facilitar e garantir todas as permissões necessárias no pipeline, considere anexar as seguintes políticas gerenciadas AWS com acesso completo (**FullAccess**):
 
-   | Serviço / Recurso                   | Políticas Gerenciadas AWS FullAccess                  |
-   |-----------------------------------|-------------------------------------------------------|
-   | **S3**                            | `AmazonS3FullAccess`                                  |
-   | **DynamoDB** (se usar lock)       | `AmazonDynamoDBFullAccess`                            |
-   | **CloudWatch Logs**               | `CloudWatchLogsFullAccess`                            |
-   | **IAM** (para roles e trust)      | `IAMFullAccess`                                       |
-   | **Lambda**                       | `AWSLambda_FullAccess`                                |
-   | **EventBridge**                  | `AmazonEventBridgeFullAccess`                         |
-   | **ECS / ECR** (se usar container) | `AmazonECS_FullAccess`, `AmazonECRFullAccess`        |
-   | **CloudFront**                   | `CloudFrontFullAccess`                                |
+   | Serviço / Recurso                   | Políticas Gerenciadas AWS FullAccess                                |
+   |-----------------------------------|-----------------------------------------------------------------------|
+   | **S3**                            | `AmazonS3FullAccess`                                                  |
+   | **CloudWatch Logs**               | `CloudWatchLogsFullAccess`                                            |
+   | **IAM** (para roles e trust)      | `IAMFullAccess`                                                       |
+   | **Lambda**                        | `AWSLambda_FullAccess`                                                |
+   | **EventBridge**                   | `AmazonEventBridgeFullAccess`                                         |
+   | **ECS / ECR** (se usar container) | `AmazonECS_FullAccess`, `AmazonEC2ContainerRegistryFullAccess`        |
+   | **CloudFront**                    | `CloudFrontFullAccess`                                                |
 
    > ⚠️ **Atenção:**  
    > O uso de políticas FullAccess fornece permissões amplas. Em ambientes de produção, é recomendável criar políticas com o princípio do menor privilégio, limitando permissões apenas ao necessário e restringindo recursos via ARNs.
+
+
 
 5. **Configurar o GitHub Actions**  
    - Configure as variáveis de ambiente no GitHub Actions Secrets and Variables, por exemplo:
