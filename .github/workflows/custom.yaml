@@ -52,7 +52,6 @@ jobs:
           echo "AWS_ENVIRONMENT=dev" >> $GITHUB_ENV
           echo "AWS_REGION=${{ inputs.aws-region }}" >> $GITHUB_ENV
           echo "STATEFILE_BUCKET=${{ vars.STATEFILE_BUCKET_NAME_TF_DEV }}" >> $GITHUB_ENV
-          echo "LOCK_DYNAMODB_TABLE=${{ secrets.DYNAMODB_TABLE_TF_DEV }}" >> $GITHUB_ENV
           echo "AWS_ASSUME_ROLE_ARN=${{ secrets.AWS_ASSUME_ROLE_ARN_DEV }}" >> $GITHUB_ENV
         
       - name: Configure AWS credentials
@@ -76,8 +75,7 @@ jobs:
           echo "Terraform Init"
           terraform init \
             -backend-config="bucket=${STATEFILE_BUCKET}" \
-            -backend-config="region=${AWS_REGION}" \
-            -backend-config="dynamodb_table=${LOCK_DYNAMODB_TABLE}"
+            -backend-config="region=${AWS_REGION}"
 
           if [[ "$DESTROY" == "true" ]]; then
             echo "Executando Terraform Destroy no diretório: $DIR"

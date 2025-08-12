@@ -15,7 +15,6 @@ jobs:
       aws-environment: "dev"
       aws-region: ${{ vars.AWS_REGION }}
       aws-statefile-s3-bucket: ${{ vars.STATEFILE_BUCKET_NAME_TF_DEV }}
-      aws-lock-dynamodb-table: ${{ vars.DYNAMODB_TABLE_TF }}
     secrets:
       aws-assume-role-arn: ${{ secrets.AWS_ASSUME_ROLE_ARN_DEV }}
       aws-account-id: ${{ secrets.AWS_ACCOUNT_ID_DEV }}
