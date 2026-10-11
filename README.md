@@ -21,6 +21,7 @@ Este serviço entrega uma aplicação FrontEnd estática simples, hospedada em u
 
 - **Política de bucket restritiva**  
   Permite acesso somente via CloudFront para maior segurança.
+  
 
 - **HTTPS obrigatório e compressão ativada**  
   Todas as requisições são redirecionadas para HTTPS e os arquivos são entregues comprimidos para otimizar a transferência.
